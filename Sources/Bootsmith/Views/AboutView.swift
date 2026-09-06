@@ -9,7 +9,7 @@ struct AboutView: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Forge").font(.title.weight(.semibold))
+                    Text("Bootsmith").font(.title.weight(.semibold))
                     Text(L.t("Bootable USB drives for BIOS and UEFI."))
                         .font(.callout).foregroundStyle(.secondary)
                     Text(String(format: L.t("Version %@"), Self.version))
@@ -18,7 +18,7 @@ struct AboutView: View {
                 Divider()
                 VStack(alignment: .leading, spacing: 6) {
                     row(L.t("Developer"), "Paulo Victor Mesquita", "https://github.com/mesquitadev")
-                    row(L.t("Source"), "github.com/mesquitadev/forge", "https://github.com/mesquitadev/forge")
+                    row(L.t("Source"), "github.com/mesquitadev/bootsmith", "https://github.com/mesquitadev/bootsmith")
                 }
                 Divider()
                 Text(L.t("Free and open source under the MIT license."))

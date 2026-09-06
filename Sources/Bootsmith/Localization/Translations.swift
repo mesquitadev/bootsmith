@@ -55,8 +55,8 @@ extension L {
         // MARK: Erros
         "The image is %@ and the device only has %@.": "A imagem tem %@ e o dispositivo só tem %@.",
         "Authorization cancelled — nothing was written.": "Autorização cancelada — nada foi gravado.",
-        "macOS blocked access to %@. Grant Full Disk Access to Forge in System Settings › Privacy & Security, then reopen the app.":
-            "O macOS bloqueou o acesso a %@. Conceda Acesso Total ao Disco ao Forge em Ajustes do Sistema › Privacidade e Segurança e reabra o app.",
+        "macOS blocked access to %@. Grant Full Disk Access to Bootsmith in System Settings › Privacy & Security, then reopen the app.":
+            "O macOS bloqueou o acesso a %@. Conceda Acesso Total ao Disco ao Bootsmith em Ajustes do Sistema › Privacidade e Segurança e reabra o app.",
         "The write failed (status %d). %@": "A gravação falhou (status %d). %@",
         "Could not read the image.": "Não foi possível ler a imagem.",
 
@@ -64,7 +64,7 @@ extension L {
         "General": "Geral",
         "Language": "Idioma",
         "System": "Sistema",
-        "About Forge": "Sobre o Forge",
+        "About Bootsmith": "Sobre o Bootsmith",
         "Bootable USB drives for BIOS and UEFI.": "Pendrives bootáveis para BIOS e UEFI.",
         "Version %@": "Versão %@",
         "Developer": "Desenvolvedor",

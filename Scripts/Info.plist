@@ -2,11 +2,11 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleName</key>            <string>Forge</string>
-    <key>CFBundleDisplayName</key>     <string>Forge</string>
-    <key>CFBundleExecutable</key>      <string>Forge</string>
-    <key>CFBundleIdentifier</key>      <string>dev.mesquita.Forge</string>
-    <key>CFBundleIconFile</key>        <string>Forge</string>
+    <key>CFBundleName</key>            <string>Bootsmith</string>
+    <key>CFBundleDisplayName</key>     <string>Bootsmith</string>
+    <key>CFBundleExecutable</key>      <string>Bootsmith</string>
+    <key>CFBundleIdentifier</key>      <string>dev.mesquita.Bootsmith</string>
+    <key>CFBundleIconFile</key>        <string>Bootsmith</string>
     <key>CFBundlePackageType</key>     <string>APPL</string>
     <key>CFBundleShortVersionString</key> <string>1.0</string>
     <key>CFBundleVersion</key>         <string>1</string>

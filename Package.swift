@@ -2,12 +2,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "Forge",
+    name: "Bootsmith",
     platforms: [.macOS(.v14)],
     targets: [
         .executableTarget(
-            name: "Forge",
-            path: "Sources/Forge",
+            name: "Bootsmith",
+            path: "Sources/Bootsmith",
             swiftSettings: [.swiftLanguageMode(.v5)]
         )
     ]

@@ -36,7 +36,7 @@ struct Flasher: Sendable {
             case .authorizationDenied:
                 return translate("Authorization cancelled — nothing was written.")
             case .accessDenied(let device):
-                return String(format: translate("macOS blocked access to %@. Grant Full Disk Access to Forge in System Settings › Privacy & Security, then reopen the app."), device)
+                return String(format: translate("macOS blocked access to %@. Grant Full Disk Access to Bootsmith in System Settings › Privacy & Security, then reopen the app."), device)
             case .writeFailed(let status, let detail):
                 return String(format: translate("The write failed (status %d). %@"), Int(status), detail)
             }

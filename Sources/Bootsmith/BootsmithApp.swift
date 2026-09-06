@@ -13,13 +13,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 @main
-struct ForgeApp: App {
+struct BootsmithApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @Environment(\.openWindow) private var openWindow
     @State private var model = AppModel()
 
     var body: some Scene {
-        Window("Forge", id: "main") {
+        Window("Bootsmith", id: "main") {
             ContentView()
                 .environment(model)
                 .frame(minWidth: 520, minHeight: 560)
@@ -27,12 +27,12 @@ struct ForgeApp: App {
         .windowResizability(.contentSize)
         .commands {
             CommandGroup(replacing: .appInfo) {
-                Button(L.t("About Forge")) { openWindow(id: "about") }
+                Button(L.t("About Bootsmith")) { openWindow(id: "about") }
             }
             CommandGroup(replacing: .newItem) {}
         }
 
-        Window(L.t("About Forge"), id: "about") {
+        Window(L.t("About Bootsmith"), id: "about") {
             AboutView()
         }
         .windowResizability(.contentSize)
