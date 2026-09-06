@@ -29,6 +29,13 @@ struct Drive: Identifiable, Sendable, Hashable {
         ByteCountFormatter.string(fromByteCount: size, countStyle: .file)
     }
 
+    /// Acima disto é quase certamente um HD ou SSD externo, não um pendrive.
+    /// Não bloqueia — há pendrives de 256 GB — mas merece um aviso, porque
+    /// gravar uma ISO num disco de backup apaga tudo.
+    var looksLikeAnExternalDisk: Bool {
+        size > 128 * 1_000_000_000
+    }
+
     /// O que aparece na lista: "Kingston DataTraveler 3.0 · 31 GB · USB".
     var summary: String {
         "\(name) · \(formattedSize) · \(busProtocol)"

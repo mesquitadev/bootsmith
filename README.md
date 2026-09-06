@@ -29,6 +29,21 @@ Grant **Full Disk Access** to Bootsmith in System Settings › Privacy & Securit
 Since macOS 13 removable volumes are protected, and without that permission even
 root cannot open `/dev/rdiskN`.
 
+## Features
+
+- **Compressed images**, written straight from `.xz`, `.gz`, `.zip` and `.bz2`
+  without unpacking first — Raspberry Pi OS, Armbian and OpenWrt all ship this
+  way. Decompression happens in flow, block by block; nothing intermediate
+  touches the disk. `.xz` uses Apple's Compression framework, so there is no
+  dependency on the `xz` binary, which macOS does not ship.
+- **Checksum verification** before writing: paste a SHA-256 or the contents of a
+  `SHA256SUMS` file and Bootsmith finds the line for your image. A corrupt ISO
+  writes without complaint and only reveals itself in front of the server.
+- **Restore the drive** — after receiving an ISO a stick is unreadable to Finder,
+  which offers only to initialize it. One menu reformats it as exFAT or FAT32.
+- **Drives appear and disappear on their own**, with a warning when the selected
+  disk is large enough to be an external drive rather than a USB stick.
+
 ## Design notes
 
 **No partition scheme to choose.** Rufus asks you to pick MBR/GPT and

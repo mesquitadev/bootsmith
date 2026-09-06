@@ -62,6 +62,38 @@ extension L {
             "Apenas %@ de %@ foram gravados — o dispositivo pode ter sido removido.",
         "Could not read the image.": "Não foi possível ler a imagem.",
 
+        // MARK: Imagens comprimidas
+        "%@ compressed": "%@ comprimidos",
+        "%@ compressed · final size unknown": "%@ comprimidos · tamanho final desconhecido",
+        "Decompression failed: %@": "A descompressão falhou: %@",
+
+        // MARK: Checksum
+        "Verify checksum": "Conferir checksum",
+        "Paste a SHA-256, or the contents of SHA256SUMS":
+            "Cole um SHA-256, ou o conteúdo do arquivo SHA256SUMS",
+        "Check": "Conferir",
+        "Matches": "Confere",
+        "Does not match — do not use this image": "Não confere — não use esta imagem",
+        "No SHA-256 found for this file": "Nenhum SHA-256 encontrado para este arquivo",
+
+        // MARK: Restaurar o pendrive
+        "Restore drive": "Restaurar pendrive",
+        "Erase as %@": "Apagar como %@",
+        "Erase %@ as %@?": "Apagar %@ como %@?",
+        "Erase": "Apagar",
+        "Everything on the drive will be lost, including the image you wrote.":
+            "Tudo no pendrive será perdido, inclusive a imagem que você gravou.",
+        "Erasing the drive…": "Apagando o pendrive…",
+        "Drive restored as %@": "Pendrive restaurado como %@",
+        "You can use it in Finder again.": "Você pode usá-lo no Finder de novo.",
+
+        // MARK: Avisos de dispositivo
+        "too small": "pequeno demais",
+        "The image does not fit on this device.": "A imagem não cabe neste dispositivo.",
+        "large disk": "disco grande",
+        "This looks like an external disk rather than a USB stick.":
+            "Isto parece um disco externo, não um pendrive.",
+
         // MARK: Ajustes e Sobre
         "General": "Geral",
         "Language": "Idioma",

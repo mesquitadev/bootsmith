@@ -43,6 +43,8 @@ struct ResultSheet: View {
         case .done(let bytes, let verified, _):
             let size = ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
             return String(format: L.t(verified ? "%@ written and verified" : "%@ written"), size)
+        case .erased(let filesystem):
+            return String(format: L.t("Drive restored as %@"), filesystem)
         case .failed(let message):
             return message
         default:
@@ -55,6 +57,8 @@ struct ResultSheet: View {
         case .done(_, let verified, let ejected):
             if !verified { return L.t("Verification failed: the drive does not match the image.") }
             return ejected ? L.t("The drive was ejected — you can unplug it.") : nil
+        case .erased:
+            return L.t("You can use it in Finder again.")
         default:
             return nil
         }

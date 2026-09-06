@@ -102,8 +102,10 @@ struct Flasher: Sendable {
         }
         defer { close(descriptor) }
 
-        let source = try FileHandle(forReadingFrom: image.url)
-        defer { try? source.close() }
+        // A leitura passa pelo descompressor quando a imagem é comprimida; para
+        // uma imagem crua o fluxo é a própria leitura do arquivo.
+        let source = try ImageSource.open(image.url, format: image.format)
+        defer { source.close() }
 
         var written: Int64 = 0
         var imageDigest = SHA256()
@@ -111,7 +113,8 @@ struct Flasher: Sendable {
         var lastReport = Date.distantPast
 
         while true {
-            guard let chunk = try source.read(upToCount: Self.chunkSize), !chunk.isEmpty else { break }
+            let chunk = try source.read(upTo: Self.chunkSize)
+            if chunk.isEmpty { break }
             imageDigest.update(data: chunk)
 
             var block = chunk
@@ -131,7 +134,8 @@ struct Flasher: Sendable {
             }
         }
 
-        guard written == image.size else {
+        // Com tamanho estimado (bzip2), o total só se conhece ao final.
+        guard !image.sizeIsExact || written == image.size else {
             throw FlashError.shortWrite(written: written, expected: image.size)
         }
         fsync(descriptor)
@@ -142,7 +146,7 @@ struct Flasher: Sendable {
 
         guard verify else { return true }
         return try Self.verify(descriptor: descriptor, expecting: imageDigest.finalize(),
-                               size: image.size, onProgress: onVerifyProgress)
+                               size: written, onProgress: onVerifyProgress)
     }
 
     /// Um `write` pode gravar menos que o pedido; o laço garante o bloco inteiro.

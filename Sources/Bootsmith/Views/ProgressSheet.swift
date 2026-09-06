@@ -38,6 +38,7 @@ struct ProgressSheet: View {
     private var symbol: String {
         switch model.phase {
         case .verifying: "checkmark.shield"
+        case .erasing: "eraser"
         default: "arrow.down.circle"
         }
     }
@@ -45,6 +46,7 @@ struct ProgressSheet: View {
     private var title: String {
         switch model.phase {
         case .unmounting: L.t("Unmounting the device…")
+        case .erasing: L.t("Erasing the drive…")
         case .verifying: L.t("Verifying")
         default: L.t("Writing")
         }
