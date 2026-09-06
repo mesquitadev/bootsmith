@@ -50,6 +50,19 @@ opens the device as root, and stays a child of the app, so TCC judges it by the
 responsible app. Nothing is installed on the machine and the password never
 passes through us.
 
+Bootsmith uses its `-stdoutpipe` mode, which hands the open descriptor back over
+`SCM_RIGHTS`, rather than the simpler `-w` mode that copies stdin. Three reasons:
+the pipe costs an extra copy of every block; if `authopen` dies mid-write the
+parent takes a `SIGPIPE` and dies with it, which in a GUI app is a crash with no
+message; and a read/write descriptor lets one authorization cover both the write
+and the verification pass.
+
+**Sector alignment.** The raw node only accepts reads and writes aligned to the
+512-byte sector — an odd-sized request is rejected with `EINVAL`. Images whose
+size is not a multiple of 512 are padded with zeros on the final block, and the
+verification pass reads aligned and trims the excess before hashing. This is
+covered by a test with a deliberately odd-sized image.
+
 **Verification is on by default.** A drive can accept every write and still hold
 garbage — worn flash, a bad cable, a cheap adapter. Finding out here costs a few
 minutes; finding out in front of the server costs a trip.

@@ -1,6 +1,7 @@
 import Foundation
+import CryptoKit
 
-/// Grava uma imagem num disco inteiro.
+/// Grava uma imagem num disco inteiro e confere o resultado.
 ///
 /// Escrever em `/dev/rdiskN` esbarra em duas barreiras independentes: as
 /// permissões Unix (o nó pertence a root) e o TCC, que desde o macOS 13 protege
@@ -8,20 +9,17 @@ import Foundation
 /// resolve a primeira e falha na segunda — o processo elevado roda num contexto
 /// próprio e não herda o Acesso Total ao Disco concedido ao app.
 ///
-/// Por isso usamos `authopen`: um utilitário setuid do próprio macOS que pede a
-/// autorização, abre o arquivo como root e continua sendo filho do app, de modo
-/// que o TCC o avalia pelo app responsável. Nada fica instalado na máquina, e a
-/// senha nunca passa por nós.
+/// `PrivilegedDevice` resolve as duas de uma vez, e devolve um descritor de
+/// leitura e escrita: a mesma autorização cobre a gravação e a releitura da
+/// verificação.
 struct Flasher: Sendable {
     enum FlashError: LocalizedError {
         case imageLargerThanDrive(image: Int64, drive: Int64)
         case authorizationDenied
         case accessDenied(String)
-        case writeFailed(status: Int32, detail: String)
+        case writeFailed(String)
+        case shortWrite(written: Int64, expected: Int64)
 
-        /// Texto em inglês, para logs. A UI usa `localized`, que traduz — a
-        /// conformidade com `LocalizedError` é nonisolated e não pode alcançar
-        /// a tabela de tradução, que vive no MainActor.
         var errorDescription: String? { compose { $0 } }
 
         @MainActor
@@ -37,8 +35,12 @@ struct Flasher: Sendable {
                 return translate("Authorization cancelled — nothing was written.")
             case .accessDenied(let device):
                 return String(format: translate("macOS blocked access to %@. Grant Full Disk Access to Bootsmith in System Settings › Privacy & Security, then reopen the app."), device)
-            case .writeFailed(let status, let detail):
-                return String(format: translate("The write failed (status %d). %@"), Int(status), detail)
+            case .writeFailed(let detail):
+                return String(format: translate("The write failed: %@"), detail)
+            case .shortWrite(let written, let expected):
+                let w = ByteCountFormatter.string(fromByteCount: written, countStyle: .file)
+                let e = ByteCountFormatter.string(fromByteCount: expected, countStyle: .file)
+                return String(format: translate("Only %@ of %@ were written — the drive may have been removed."), w, e)
             }
         }
     }
@@ -46,7 +48,6 @@ struct Flasher: Sendable {
     struct Progress: Sendable {
         var bytesWritten: Int64
         var totalBytes: Int64
-        /// Média móvel, para a estimativa não oscilar a cada bloco.
         var bytesPerSecond: Double
 
         var fraction: Double {
@@ -62,89 +63,144 @@ struct Flasher: Sendable {
     let image: DiskImage
     let drive: Drive
 
-    /// 4 MiB: o mesmo bloco que o `dd` usa por convenção em pendrives. Blocos
-    /// menores multiplicam syscalls sem ganho; maiores não aceleram mais nada.
+    /// 4 MiB, o mesmo bloco que o `dd` usa por convenção em pendrives.
     private static let chunkSize = 4 * 1024 * 1024
 
-    func flash(onProgress: @Sendable @escaping (Progress) -> Void) async throws {
+    /// O nó bruto (`/dev/rdiskN`) só aceita leituras e escritas alinhadas ao
+    /// setor: uma escrita de tamanho arbitrário é rejeitada com EINVAL. Como a
+    /// imagem pode terminar no meio de um setor, o último bloco é completado
+    /// com zeros — o espaço além da imagem é área livre do dispositivo.
+    private static let sectorSize = 512
+
+    private static func roundedUpToSector(_ value: Int) -> Int {
+        (value + sectorSize - 1) / sectorSize * sectorSize
+    }
+
+    /// Grava e, se `verify`, relê o dispositivo comparando digests.
+    /// Devolve `true` quando a verificação passou (ou não foi pedida).
+    func flash(
+        verify: Bool,
+        onProgress: @Sendable @escaping (Progress) -> Void,
+        onVerifyProgress: @Sendable @escaping (Double) -> Void
+    ) async throws -> Bool {
         guard image.size <= drive.size else {
             throw FlashError.imageLargerThanDrive(image: image.size, drive: drive.size)
         }
 
-        // Desmontar é obrigatório: com um volume montado o kernel recusa a
-        // escrita no dispositivo inteiro.
+        // Com um volume montado o kernel recusa a escrita no dispositivo inteiro.
         _ = try? Shell.run("/usr/sbin/diskutil", ["unmountDisk", drive.deviceNode])
+
+        let descriptor: Int32
+        do {
+            descriptor = try PrivilegedDevice.open(drive.rawDeviceNode, writable: true)
+        } catch PrivilegedDevice.OpenError.authorizationDenied {
+            throw FlashError.authorizationDenied
+        } catch PrivilegedDevice.OpenError.notPermitted {
+            throw FlashError.accessDenied(drive.rawDeviceNode)
+        } catch {
+            throw FlashError.writeFailed(error.localizedDescription)
+        }
+        defer { close(descriptor) }
 
         let source = try FileHandle(forReadingFrom: image.url)
         defer { try? source.close() }
 
-        let process = Process()
-        process.executableURL = URL(filePath: "/usr/libexec/authopen")
-        // -w escreve o que vier do stdin; O_WRONLY abre o nó bruto para escrita.
-        process.arguments = ["-w", "-o", "\(O_WRONLY)", drive.rawDeviceNode]
-
-        let input = Pipe()
-        let errors = Pipe()
-        process.standardInput = input
-        process.standardError = errors
-        process.standardOutput = Pipe()
-
-        try process.run()
-
         var written: Int64 = 0
+        var imageDigest = SHA256()
         let started = Date()
         var lastReport = Date.distantPast
 
-        do {
-            while true {
-                guard let chunk = try source.read(upToCount: Self.chunkSize), !chunk.isEmpty else { break }
-                try input.fileHandleForWriting.write(contentsOf: chunk)
-                written += Int64(chunk.count)
+        while true {
+            guard let chunk = try source.read(upToCount: Self.chunkSize), !chunk.isEmpty else { break }
+            imageDigest.update(data: chunk)
 
-                // Reportar a cada bloco inundaria a UI; 4 vezes por segundo basta.
-                if Date().timeIntervalSince(lastReport) > 0.25 {
-                    lastReport = Date()
-                    let elapsed = Date().timeIntervalSince(started)
-                    onProgress(Progress(bytesWritten: written, totalBytes: image.size,
-                                        bytesPerSecond: elapsed > 0 ? Double(written) / elapsed : 0))
-                }
+            var block = chunk
+            let aligned = Self.roundedUpToSector(chunk.count)
+            if aligned > chunk.count {
+                block.append(contentsOf: [UInt8](repeating: 0, count: aligned - chunk.count))
             }
-        } catch {
-            // O pipe quebra quando o authopen morre — a causa real está no stderr.
-            try? input.fileHandleForWriting.close()
-            process.waitUntilExit()
-            throw Self.interpret(process: process, errors: errors, device: drive.rawDeviceNode)
+            try Self.writeFully(block, to: descriptor)
+            written += Int64(chunk.count)
+
+            // Reportar a cada bloco inundaria a UI; 4 vezes por segundo basta.
+            if Date().timeIntervalSince(lastReport) > 0.25 {
+                lastReport = Date()
+                let elapsed = Date().timeIntervalSince(started)
+                onProgress(Progress(bytesWritten: written, totalBytes: image.size,
+                                    bytesPerSecond: elapsed > 0 ? Double(written) / elapsed : 0))
+            }
         }
 
-        try? input.fileHandleForWriting.close()
-        process.waitUntilExit()
-
-        guard process.terminationStatus == 0 else {
-            throw Self.interpret(process: process, errors: errors, device: drive.rawDeviceNode)
+        guard written == image.size else {
+            throw FlashError.shortWrite(written: written, expected: image.size)
         }
+        fsync(descriptor)
 
         let elapsed = Date().timeIntervalSince(started)
         onProgress(Progress(bytesWritten: image.size, totalBytes: image.size,
                             bytesPerSecond: elapsed > 0 ? Double(written) / elapsed : 0))
+
+        guard verify else { return true }
+        return try Self.verify(descriptor: descriptor, expecting: imageDigest.finalize(),
+                               size: image.size, onProgress: onVerifyProgress)
     }
 
-    /// Traduz a saída do `authopen` em algo acionável. "Operation not permitted"
-    /// com o processo já rodando como root significa TCC, não permissão Unix —
-    /// e essa distinção é a diferença entre o usuário saber ou não o que fazer.
-    private static func interpret(process: Process, errors: Pipe, device: String) -> FlashError {
-        let detail = String(decoding: errors.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if detail.contains("not permitted") || detail.contains("Operation not permitted") {
-            return .accessDenied(device)
+    /// Um `write` pode gravar menos que o pedido; o laço garante o bloco inteiro.
+    private static func writeFully(_ data: Data, to descriptor: Int32) throws {
+        try data.withUnsafeBytes { buffer in
+            var offset = 0
+            while offset < buffer.count {
+                let result = write(descriptor, buffer.baseAddress!.advanced(by: offset), buffer.count - offset)
+                if result < 0 {
+                    if errno == EINTR { continue }
+                    throw FlashError.writeFailed(String(cString: strerror(errno)))
+                }
+                if result == 0 { throw FlashError.writeFailed("device stopped accepting data") }
+                offset += result
+            }
         }
-        if detail.isEmpty && process.terminationStatus == 1 {
-            return .authorizationDenied
-        }
-        return .writeFailed(status: process.terminationStatus, detail: detail)
     }
 
-    /// Ejeta ao final para que o usuário possa remover o pendrive com segurança.
+    // Internal, e não private, para que o teste possa rodar a verificação
+    // isolada contra um dispositivo corrompido de propósito.
+    /// Relê do dispositivo a mesma quantidade de bytes da imagem e compara os
+    /// digests. Um pendrive pode aceitar toda a escrita e ainda assim conter
+    /// lixo — flash gasto, cabo ruim, adaptador barato. Descobrir aqui custa
+    /// minutos; descobrir na frente do servidor custa uma viagem.
+    static func verify(
+        descriptor: Int32,
+        expecting expected: SHA256Digest,
+        size: Int64,
+        onProgress: @Sendable (Double) -> Void
+    ) throws -> Bool {
+        guard lseek(descriptor, 0, SEEK_SET) == 0 else {
+            throw FlashError.writeFailed("could not rewind the device")
+        }
+        var digest = SHA256()
+        var read: Int64 = 0
+        var buffer = [UInt8](repeating: 0, count: chunkSize + sectorSize)
+
+        while read < size {
+            // A leitura também precisa ser alinhada; o excedente do último
+            // setor é descartado antes de entrar no digest.
+            let remaining = Int(min(Int64(chunkSize), size - read))
+            let wanted = roundedUpToSector(remaining)
+            let got = buffer.withUnsafeMutableBytes { Foundation.read(descriptor, $0.baseAddress, wanted) }
+            if got < 0 {
+                if errno == EINTR { continue }
+                throw FlashError.writeFailed(String(cString: strerror(errno)))
+            }
+            if got == 0 { break }
+            let useful = min(got, remaining)
+            digest.update(data: Data(buffer[0..<useful]))
+            read += Int64(useful)
+            onProgress(Double(read) / Double(size))
+        }
+
+        guard read == size else { return false }
+        return digest.finalize() == expected
+    }
+
     static func eject(_ drive: Drive) {
         _ = try? Shell.run("/usr/sbin/diskutil", ["eject", drive.deviceNode])
     }

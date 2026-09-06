@@ -57,7 +57,9 @@ extension L {
         "Authorization cancelled — nothing was written.": "Autorização cancelada — nada foi gravado.",
         "macOS blocked access to %@. Grant Full Disk Access to Bootsmith in System Settings › Privacy & Security, then reopen the app.":
             "O macOS bloqueou o acesso a %@. Conceda Acesso Total ao Disco ao Bootsmith em Ajustes do Sistema › Privacidade e Segurança e reabra o app.",
-        "The write failed (status %d). %@": "A gravação falhou (status %d). %@",
+        "The write failed: %@": "A gravação falhou: %@",
+        "Only %@ of %@ were written — the drive may have been removed.":
+            "Apenas %@ de %@ foram gravados — o dispositivo pode ter sido removido.",
         "Could not read the image.": "Não foi possível ler a imagem.",
 
         // MARK: Ajustes e Sobre

@@ -91,18 +91,17 @@ final class AppModel {
         task = Task { [weak self] in
             guard let self else { return }
             let flasher = Flasher(image: image, drive: drive)
+            let shouldVerify = verifyAfterWrite
             do {
-                try await flasher.flash { progress in
-                    Task { @MainActor in self.phase = .writing(progress) }
-                }
-
-                var verified = true
-                if verifyAfterWrite {
-                    phase = .verifying(0)
-                    verified = try await Verifier(image: image, drive: drive).verify { fraction in
+                let verified = try await flasher.flash(
+                    verify: shouldVerify,
+                    onProgress: { progress in
+                        Task { @MainActor in self.phase = .writing(progress) }
+                    },
+                    onVerifyProgress: { fraction in
                         Task { @MainActor in self.phase = .verifying(fraction) }
                     }
-                }
+                )
 
                 var ejected = false
                 if ejectAfterWrite, verified {
